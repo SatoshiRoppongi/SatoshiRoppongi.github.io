@@ -4,12 +4,18 @@ const approach = document.querySelector('.approach');
 const cards = [...document.querySelectorAll('.approach-card')];
 const indicators = [...document.querySelectorAll('.step-indicator span')];
 const progress = document.querySelector('.approach-progress > span');
-const orbit = document.querySelector('.orbit-one');
+const heroVideo = document.querySelector('.hero-media');
 const revealElements = document.querySelectorAll('.reveal');
 let observer;
 let scheduled = false;
 function configureMotion() {
   document.documentElement.classList.toggle('motion', !reducedMotion.matches);
+  if (reducedMotion.matches) {
+    heroVideo.pause();
+    heroVideo.currentTime = 2.5;
+  } else {
+    heroVideo.play().catch(() => {});
+  }
   observer?.disconnect();
   if (!reducedMotion.matches && 'IntersectionObserver' in window) {
     observer = new IntersectionObserver(entries => {
@@ -40,11 +46,9 @@ function updateScroll() {
     cards.forEach(card => card.classList.add('active'));
   }
   if (!reducedMotion.matches && window.scrollY < window.innerHeight * 1.5) {
-    const stretch = Math.min(window.scrollY / 2000, .15);
-    orbit.style.transform = `translate(-50%, -50%) scale(${1 + stretch}, ${1 - stretch}) rotate(${window.scrollY / 10}deg)`;
-  } else if (reducedMotion.matches) {
-    orbit.style.transform = '';
-  }
+    const shift = Math.min(window.scrollY / 18, 28);
+    heroVideo.style.transform = `scale(1.035) translateY(${shift}px)`;
+  } else if (reducedMotion.matches) heroVideo.style.transform = '';
 }
 function requestScrollUpdate() {
   if (!scheduled) { scheduled = true; requestAnimationFrame(updateScroll); }
