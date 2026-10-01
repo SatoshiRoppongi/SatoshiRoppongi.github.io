@@ -10,6 +10,7 @@ const atmosphereCanvas = document.querySelector('#atmosphere-canvas');
 const atmosphereContext = atmosphereCanvas.getContext('2d', { alpha: false });
 const scrollProgress = document.querySelector('#scroll-progress');
 const scrollChapter = document.querySelector('#scroll-chapter');
+const atmosphereGrid = document.querySelector('.atmosphere-grid');
 const atmosphereSections = [
   document.querySelector('.hero'),
   document.querySelector('.expertise'),
@@ -31,6 +32,9 @@ let atmosphereWidth = 0;
 let atmosphereHeight = 0;
 let observer;
 let scheduled = false;
+let atmosphereAnimating = false;
+let lastScrollY = window.scrollY;
+let scrollVelocity = 0;
 
 function clamp(value, min = 0, max = 1) { return Math.min(max, Math.max(min, value)); }
 function smoothstep(value) { const t = clamp(value); return t * t * (3 - 2 * t); }
@@ -61,6 +65,7 @@ function atmosphereState() {
   const local = next === index ? 0 : smoothstep((focus - anchors[index]) / span);
   return {
     index,
+    local,
     pageProgress,
     base: mixColor(atmospherePalettes[index].base, atmospherePalettes[next].base, local),
     light: mixColor(atmospherePalettes[index].light, atmospherePalettes[next].light, local),
@@ -71,7 +76,9 @@ function atmosphereState() {
 function drawAtmosphere() {
   if (!atmosphereWidth || !atmosphereHeight) resizeAtmosphere();
   const state = atmosphereState();
-  const { pageProgress, base, light, ink } = state;
+  const { pageProgress, base, light, ink, local } = state;
+  const velocity = clamp(scrollVelocity / 90);
+  const transition = Math.sin(local * Math.PI) ** 8;
   pointer.x = mix(pointer.x, pointer.targetX, .12);
   pointer.y = mix(pointer.y, pointer.targetY, .12);
   atmosphereContext.fillStyle = colorString(base);
@@ -87,6 +94,19 @@ function drawAtmosphere() {
   atmosphereContext.fillStyle = glow;
   atmosphereContext.fillRect(0, 0, atmosphereWidth, atmosphereHeight);
 
+  const counterGlow = atmosphereContext.createRadialGradient(
+    atmosphereWidth - glowX * .38,
+    atmosphereHeight - glowY * .3,
+    0,
+    atmosphereWidth - glowX * .38,
+    atmosphereHeight - glowY * .3,
+    glowRadius * .72,
+  );
+  counterGlow.addColorStop(0, colorString(ink, state.index === 2 ? .18 : .11 + velocity * .08));
+  counterGlow.addColorStop(1, colorString(ink, 0));
+  atmosphereContext.fillStyle = counterGlow;
+  atmosphereContext.fillRect(0, 0, atmosphereWidth, atmosphereHeight);
+
   const sweep = atmosphereContext.createLinearGradient(0, 0, atmosphereWidth, atmosphereHeight);
   sweep.addColorStop(0, colorString(ink, 0));
   sweep.addColorStop(.5, colorString(ink, state.index === 2 ? .11 : .035));
@@ -94,33 +114,89 @@ function drawAtmosphere() {
   atmosphereContext.fillStyle = sweep;
   atmosphereContext.fillRect(0, 0, atmosphereWidth, atmosphereHeight);
 
+  // A large chapter marker makes every section feel like a new visual scene.
   atmosphereContext.save();
-  atmosphereContext.translate(atmosphereWidth * (.72 - pageProgress * .42), atmosphereHeight * .52);
-  atmosphereContext.rotate(pageProgress * Math.PI * 1.6);
+  atmosphereContext.translate(atmosphereWidth * (.67 - local * .08), atmosphereHeight * .82);
+  atmosphereContext.rotate(-.07 + pageProgress * .09);
+  atmosphereContext.font = `700 ${Math.min(atmosphereWidth * .42, atmosphereHeight * .66)}px Arial, sans-serif`;
+  atmosphereContext.textAlign = 'center';
+  atmosphereContext.textBaseline = 'middle';
+  atmosphereContext.fillStyle = colorString(state.index === 2 ? light : ink, state.index === 2 ? .055 : .035);
+  atmosphereContext.fillText(String(state.index + 1).padStart(2, '0'), 0, 0);
+  atmosphereContext.restore();
+
+  // Luminous ribbons bend with the pointer and widen as scrolling accelerates.
+  atmosphereContext.save();
+  atmosphereContext.globalCompositeOperation = state.index === 2 ? 'screen' : 'source-over';
   atmosphereContext.lineCap = 'round';
-  const radiusBase = Math.min(atmosphereWidth, atmosphereHeight) * .23;
-  for (let index = 0; index < 4; index += 1) {
-    const radius = radiusBase * (1 + index * .62);
+  atmosphereContext.shadowColor = colorString(light, .45);
+  atmosphereContext.shadowBlur = 18 + velocity * 44;
+  for (let ribbon = 0; ribbon < (atmosphereWidth < 700 ? 2 : 3); ribbon += 1) {
+    const phase = pageProgress * Math.PI * 6 + ribbon * 1.9;
+    const startY = atmosphereHeight * (.17 + ribbon * .29) + Math.sin(phase) * atmosphereHeight * .08;
     atmosphereContext.beginPath();
-    atmosphereContext.ellipse(0, 0, radius * 1.72, radius * (.52 + index * .05), index * .42, -.85, 3.95);
-    atmosphereContext.strokeStyle = colorString(index % 2 ? light : ink, state.index === 2 ? .19 : .12);
-    atmosphereContext.lineWidth = index === 0 ? 2 : 1;
+    atmosphereContext.moveTo(-atmosphereWidth * .1, startY);
+    atmosphereContext.bezierCurveTo(
+      atmosphereWidth * (.2 + pointer.x * .13),
+      startY + Math.cos(phase) * atmosphereHeight * .36,
+      atmosphereWidth * (.68 - pointer.y * .12),
+      startY - Math.sin(phase * .8) * atmosphereHeight * .42,
+      atmosphereWidth * 1.1,
+      startY + Math.cos(phase * .55) * atmosphereHeight * .18,
+    );
+    atmosphereContext.strokeStyle = colorString(ribbon === 1 ? ink : light, .11 + velocity * .18 + transition * .13);
+    atmosphereContext.lineWidth = 1.5 + ribbon * 1.15 + velocity * 5;
     atmosphereContext.stroke();
   }
   atmosphereContext.restore();
 
-  for (let index = 0; index < 7; index += 1) {
+  atmosphereContext.save();
+  atmosphereContext.translate(atmosphereWidth * (.72 - pageProgress * .42), atmosphereHeight * .52);
+  atmosphereContext.rotate(pageProgress * Math.PI * 1.6);
+  atmosphereContext.lineCap = 'round';
+  const radiusBase = Math.min(atmosphereWidth, atmosphereHeight) * (.23 + velocity * .045);
+  for (let index = 0; index < 6; index += 1) {
+    const radius = radiusBase * (1 + index * .62);
+    atmosphereContext.beginPath();
+    atmosphereContext.ellipse(0, 0, radius * 1.72, radius * (.52 + index * .05), index * .42, -.85, 3.95);
+    atmosphereContext.strokeStyle = colorString(index % 2 ? light : ink, (state.index === 2 ? .19 : .1) + velocity * .12);
+    atmosphereContext.lineWidth = index === 0 ? 2.5 + velocity * 3 : 1 + velocity;
+    atmosphereContext.stroke();
+  }
+  atmosphereContext.restore();
+
+  for (let index = 0; index < (atmosphereWidth < 700 ? 9 : 16); index += 1) {
     const angle = pageProgress * Math.PI * 5 + index * 1.71;
     const x = atmosphereWidth * .5 + Math.cos(angle) * atmosphereWidth * (.18 + (index % 3) * .12);
     const y = atmosphereHeight * .5 + Math.sin(angle * .73) * atmosphereHeight * .34;
+    const streak = velocity * (22 + index % 4 * 9);
     atmosphereContext.beginPath();
-    atmosphereContext.arc(x, y, index % 3 === 0 ? 3 : 1.5, 0, Math.PI * 2);
-    atmosphereContext.fillStyle = colorString(index % 2 ? light : ink, .48);
-    atmosphereContext.fill();
+    atmosphereContext.moveTo(x - streak, y + streak * .2);
+    atmosphereContext.lineTo(x, y);
+    atmosphereContext.strokeStyle = colorString(index % 2 ? light : ink, .3 + velocity * .42);
+    atmosphereContext.lineWidth = index % 3 === 0 ? 3 : 1.5;
+    atmosphereContext.stroke();
+  }
+
+  if (transition > .02) {
+    const flash = atmosphereContext.createLinearGradient(0, atmosphereHeight, atmosphereWidth, 0);
+    flash.addColorStop(0, colorString(light, 0));
+    flash.addColorStop(.52, colorString(light, transition * .25));
+    flash.addColorStop(1, colorString(light, 0));
+    atmosphereContext.fillStyle = flash;
+    atmosphereContext.fillRect(0, 0, atmosphereWidth, atmosphereHeight);
   }
 
   scrollProgress.style.transform = `scaleY(${pageProgress})`;
   scrollChapter.textContent = String(state.index).padStart(2, '0');
+  atmosphereGrid.style.transform = `translate3d(${(pointer.x - .5) * 18}px, ${pageProgress * -72}px, 0) rotate(${pageProgress * 1.5}deg) scale(1.08)`;
+}
+
+function animateAtmosphere() {
+  drawAtmosphere();
+  scrollVelocity *= .87;
+  if (scrollVelocity > .2) requestAnimationFrame(animateAtmosphere);
+  else atmosphereAnimating = false;
 }
 function configureMotion() {
   document.documentElement.classList.toggle('motion', !reducedMotion.matches);
@@ -148,6 +224,9 @@ function configureMotion() {
 }
 function updateScroll() {
   scheduled = false;
+  const nextScrollY = window.scrollY;
+  scrollVelocity = Math.max(scrollVelocity, Math.abs(nextScrollY - lastScrollY));
+  lastScrollY = nextScrollY;
   if (scrollLayout.matches) {
     const headerHeight = document.querySelector('.header').offsetHeight;
     const distance = approach.offsetHeight - (window.innerHeight - headerHeight);
@@ -164,6 +243,10 @@ function updateScroll() {
     heroVideo.style.transform = `scale(1.035) translateY(${shift}px)`;
   } else if (reducedMotion.matches) heroVideo.style.transform = '';
   drawAtmosphere();
+  if (!reducedMotion.matches && scrollVelocity > .2 && !atmosphereAnimating) {
+    atmosphereAnimating = true;
+    requestAnimationFrame(animateAtmosphere);
+  }
 }
 function requestScrollUpdate() {
   if (!scheduled) { scheduled = true; requestAnimationFrame(updateScroll); }
