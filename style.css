@@ -64,7 +64,8 @@ body{background:var(--paper)}
 #atmosphere-canvas{position:absolute;inset:0;width:100%;height:100%}
 .atmosphere-grid{position:absolute;inset:-12%;opacity:.25;background-image:linear-gradient(rgb(72 88 58 / .1) 1px,transparent 1px),linear-gradient(90deg,rgb(72 88 58 / .1) 1px,transparent 1px);background-size:clamp(64px,7vw,112px) clamp(64px,7vw,112px);mask-image:linear-gradient(to bottom,transparent 0,#000 14%,#000 86%,transparent 100%);will-change:transform}
 .scroll-atmosphere:after{content:"";position:absolute;inset:-35%;background:conic-gradient(from 135deg at 50% 50%,transparent 0 39%,rgb(209 255 95 / .09) 43%,transparent 48% 100%);animation:atmosphere-sweep 18s linear infinite;mix-blend-mode:screen}
-.header,main,.footer,.detail-dialog{position:relative;z-index:1}
+.header,main,.footer{position:relative;z-index:1}
+.detail-dialog{position:fixed;z-index:30}
 .header{background:rgb(248 249 246 / .82);border-color:rgb(174 184 164 / .54);box-shadow:0 1px 0 rgb(255 255 255 / .4);backdrop-filter:blur(18px) saturate(1.16)}
 .expertise{background:rgb(255 255 255 / .62);backdrop-filter:blur(3px)}
 .approach{background:rgb(19 23 18 / .68);backdrop-filter:blur(2px)}

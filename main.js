@@ -279,11 +279,13 @@ const detailDialog = document.querySelector('#detail-dialog');
 const detailBody = detailDialog.querySelector('.dialog-body');
 let detailTrigger;
 let previousBodyOverflow;
+let detailScrollY = 0;
 if (typeof detailDialog.showModal === 'function') {
   function closeDetails() {
     detailDialog.close();
     document.body.style.overflow = previousBodyOverflow ?? '';
     detailTrigger?.focus({ preventScroll: true });
+    window.scrollTo({ top: detailScrollY, behavior: 'instant' });
   }
   detailDialog.addEventListener('cancel', event => {
     event.preventDefault();
@@ -298,10 +300,12 @@ if (typeof detailDialog.showModal === 'function') {
       content.querySelector('h2').id = 'detail-title';
       detailBody.replaceChildren(content);
       detailTrigger = summary;
+      detailScrollY = window.scrollY;
       previousBodyOverflow = document.body.style.overflow;
       detailDialog.showModal();
       document.body.style.overflow = 'hidden';
       detailDialog.scrollTop = 0;
+      window.scrollTo({ top: detailScrollY, behavior: 'instant' });
     });
   });
   detailDialog.querySelector('.dialog-close').addEventListener('click', closeDetails);
